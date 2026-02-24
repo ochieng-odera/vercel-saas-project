@@ -8,7 +8,7 @@ Billy Odera - bochieng.odera@gmail.com
 
 
 ## 🌍 Live Deployment URL
- **Live Demo:** [https://lipainsight.vercel.app] (https://vercel-saas-project-gmj4jy8oa-bochiengodera-5115s-projects.vercel.app/)
+ **Live Demo:** [https://lipainsight.vercel.app](https://vercel-saas-project-gmj4jy8oa-bochiengodera-5115s-projects.vercel.app/)
 
 
 ## 📊 Problem
