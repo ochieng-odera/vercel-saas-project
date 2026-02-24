@@ -6,3 +6,6 @@ node_modules/
 *.log
 .DS_Store
 dump/
+submission/
+webapp/.next/
+webapp/webapp/
