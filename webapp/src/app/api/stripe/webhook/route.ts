@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -22,6 +22,7 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
+  const supabase = await createClient();
 
   try {
     if (event.type === "checkout.session.completed") {
@@ -33,31 +34,25 @@ export async function POST(req: Request) {
         return new NextResponse("User ID is required in metadata", { status: 400 });
       }
 
-      // Create subscription record
-      await prisma.subscription.create({
-        data: {
-          userId: session.metadata.userId,
-          stripeSubscriptionId: stripeSub.id,
-          stripeCustomerId: stripeSub.customer as string,
-          plan: "PRO",
-          status: "ACTIVE",
-          paymentMethod: "STRIPE",
-          currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
-          currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-        },
+      await supabase.from("subscriptions").insert({
+        user_id: session.metadata.userId,
+        stripe_subscription_id: stripeSub.id,
+        stripe_customer_id: stripeSub.customer as string,
+        plan: "PRO",
+        status: "ACTIVE",
+        payment_method: "STRIPE",
+        current_period_start: new Date(stripeSub.current_period_start * 1000).toISOString(),
+        current_period_end: new Date(stripeSub.current_period_end * 1000).toISOString(),
       });
 
-      // Log payment event
-      await prisma.paymentEvent.create({
-        data: {
-          userId: session.metadata.userId,
-          provider: "STRIPE",
-          eventType: event.type,
-          amount: session.amount_total ? session.amount_total / 100 : 0,
-          currency: session.currency || "kes",
-          reference: session.id,
-          rawPayload: JSON.parse(body),
-        }
+      await supabase.from("payment_events").insert({
+        user_id: session.metadata.userId,
+        provider: "STRIPE",
+        event_type: event.type,
+        amount: session.amount_total ? session.amount_total / 100 : 0,
+        currency: session.currency || "kes",
+        reference: session.id,
+        raw_payload: JSON.parse(body),
       });
     }
 
@@ -66,15 +61,13 @@ export async function POST(req: Request) {
         session.subscription as string
       ) as any;
 
-      await prisma.subscription.updateMany({
-        where: {
-          stripeSubscriptionId: stripeSub.id,
-        },
-        data: {
+      await supabase
+        .from("subscriptions")
+        .update({
           status: "ACTIVE",
-          currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-        },
-      });
+          current_period_end: new Date(stripeSub.current_period_end * 1000).toISOString(),
+        })
+        .eq("stripe_subscription_id", stripeSub.id);
     }
 
     return new NextResponse(null, { status: 200 });
